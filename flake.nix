@@ -30,7 +30,11 @@
               styler
               tidyverse
               AmesHousing
+              givitiR
               gmodels
+              Hmisc
+              ROCit
+              ROCR
               car
               mgcv
               vcd

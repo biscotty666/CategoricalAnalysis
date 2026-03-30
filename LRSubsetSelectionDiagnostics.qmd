@@ -1,0 +1,206 @@
+---
+title: "LR Subset Selection and Diagnostics"
+format: gfm
+---
+
+[Source](https://www.ariclabarr.com/logistic-regression/part_4_subset.html)
+
+```{r}
+#| message: false
+library(AmesHousing)
+library(tidyverse)
+library(car)
+library(givitiR)
+```
+
+```{r}
+ames <- make_ordinal_ames() %>% 
+  mutate(Bonus = if_else(Sale_Price > 175000, 1, 0))
+
+set.seed(123)
+ames <- ames %>% 
+  mutate(id = row_number())
+
+train <- ames %>% 
+  sample_frac(0.7)
+
+test <- anti_join(
+  ames, train, by = "id"
+)
+```
+
+# Stepwise Regression
+
+Three common methods: Forward, Backward, Stepwise. Selection criteria inclue p-values or AIC/BIC.
+
+p-values can be used, but the significance level should be adjusted by sample size.
+
+AIC is calculated
+
+$$
+AIC = -2 \log(L) + 2p
+$$
+
+where $L$ is the likelihood function and $p$ is the number of variables being estimated in the model.
+
+BIC is calculated
+
+$$
+BIC = -2 \log(L) + p \times \log(n)
+$$
+
+The significance level changes depending on sample size.
+
+## Stepwise Selection
+
+1. Initial model is empty
+2. Each variable is tested for significance based on AIC/BIC or specified p-value
+3. The most significant is added
+4. All variables are tested, and insignificant ones are dropped
+5. Remain variables are retested, the most significant being added
+6. Repeat until no more significant variables
+
+`step` uses AIC or BIC. Must specify empty and full models.
+
+```{r}
+full_model <- glm(
+  Bonus ~ Gr_Liv_Area + factor(House_Style) + Garage_Area +
+    Fireplaces + factor(Full_Bath) + factor(Half_Bath) + Lot_Area +
+    factor(Central_Air) + Second_Flr_SF + TotRms_AbvGrd + First_Flr_SF,
+  data = train, family = binomial(link = "logit")
+)
+empty_model <- glm(
+  Bonus ~ 1, data = train, family = binomial(link = "logit"))
+
+
+step_model <- step(empty_model,
+                   scope = list(lower = formula(empty_model),
+                                upper = formula(full_model)),
+                   direction = "both")
+```
+
+```{r}
+summary(step_model)
+```
+
+## Backward Selection
+
+Starts with a full model and iteratively drops the least significant variable until no more insignificant variables are available.
+
+```{r}
+full_model <- glm(
+  Bonus ~ Gr_Liv_Area + factor(House_Style) + Garage_Area +
+    Fireplaces + factor(Full_Bath) + factor(Half_Bath) + Lot_Area +
+    factor(Central_Air) + Second_Flr_SF + TotRms_AbvGrd + First_Flr_SF,
+  data = train, family = binomial(link = "logit")
+)
+
+back_model <- step(full_model, direction = "backward")
+```
+
+```{r}
+summary(back_model)
+```
+
+## Forward with interactions
+
+Least used. Like stepwise but without the removal check at each step. The main use is to test higher order terms and interactions.
+
+To test two-way interactions, create a model with and without interactions.
+
+```{r}
+main_model <- glm(
+  Bonus ~ Gr_Liv_Area + factor(House_Style) + Garage_Area +
+    factor(Fireplaces) + factor(Full_Bath) + factor(Half_Bath) + 
+    Lot_Area + factor(Central_Air) + Second_Flr_SF + 
+    TotRms_AbvGrd + First_Flr_SF,
+  data = train, family = binomial(link = "logit")
+)
+
+int_model <- glm(
+  Bonus ~ Gr_Liv_Area + factor(House_Style) + Garage_Area +
+    Fireplaces + factor(Full_Bath) + factor(Half_Bath) + 
+    Lot_Area + factor(Central_Air) + Second_Flr_SF + 
+    TotRms_AbvGrd + First_Flr_SF +
+    Gr_Liv_Area * factor(House_Style) + 
+    TotRms_AbvGrd * factor(House_Style) +
+    Gr_Liv_Area * factor(Fireplaces),
+  data = train, family = binomial(link = "logit")
+)
+
+for_model <- step(
+  main_model,
+  scope = list(lower = formula(main_model),
+               upper = formula(int_model)),
+  direction = "forward"
+)
+```
+
+```{r}
+summary(for_model)
+```
+
+# Diagnostic Plots
+
+Instead of residuals, can use __deviance residuals__ and __Pearson residuals__.
+
+Deviance compares the model against a fully saturated (overfit) model. Pearson residuals tell how much each observation changes the Pearson Chi-squared test for the overall model.
+
+Other measures include __DFBetas__ and __Cook's D__.
+
+```{r}
+logit_model <- glm(
+  Bonus ~ Gr_Liv_Area + factor(House_Style) + Garage_Area +
+    Fireplaces + factor(Full_Bath) + Lot_Area + factor(Central_Air) +
+    TotRms_AbvGrd + Gr_Liv_Area:Fireplaces,
+  data = train, family = binomial(link = "logit")
+)
+summary(logit_model)
+```
+
+```{r}
+head(influence.measures(logit_model)$infmat)
+```
+
+```{r lrssd-cooks}
+plot(logit_model, 4)
+```
+
+```{r lrssd-dfbeta}
+dfbetasPlots(logit_model, terms = "Gr_Liv_Area",
+             id.n = 5, col = ifelse(logit_model$y == 1,
+                                    "red", "blue"))
+```
+
+The DFBetas plots show the standardized impact of each observation on the calculation of each of the parameters in the model. The main thing to look for in these plots are points that are far away from the rest of the observations.
+
+These observations are not necessarily bad per se, but have a large influence on the model. These points might need to be investigated further to see if they are actually valid observations.
+
+# Calibration Curves
+
+Calibration measures how well predicted probabilities agree with actual frequency counts of outcomes (estimated linearly across the data set). These curves can help detect if predictions are consistently too high or low in your model. A curve above the diagonal is predicting lower probabilities than observed.
+
+Best with larger sample sizes.
+
+```{r lrssd-cali-curve}
+cali_curve <- givitiCalibrationBelt(
+  o = train$Bonus,
+  e = predict(logit_model, type = "response"),
+  devel = "internal",
+  maxDeg = 5
+)
+
+plot(cali_curve, main = "Bonus Eligibility Model Calibration Curve",
+                 xlab = "Predicted Probability",
+                 ylab = "Observed Bonus Eligibility")
+```
+
+Since the diagonal line is contained in the confidence interval for our calibration curve, we do not notice any significant number of over or under predictions.
+
+
+
+
+
+
+
+
