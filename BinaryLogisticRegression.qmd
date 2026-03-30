@@ -1,6 +1,6 @@
 ---
 title: "Binary Logistic Regression"
-format: html
+format: gfm
 ---
 
 [Source](https://www.ariclabarr.com/logistic-regression/part_2_binary.html)
