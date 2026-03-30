@@ -1,6 +1,6 @@
 {
   description = "A basic flake with a shell";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/25.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/25.11";
   inputs.systems.url = "github:nix-systems/default";
   inputs.flake-utils = {
     url = "github:numtide/flake-utils";
@@ -27,11 +27,15 @@
             (with rPackages; [
               quarto
               pagedown
+              styler
               tidyverse
               AmesHousing
               gmodels
+              car
+              mgcv
               vcd
               vcdExtra
+              visreg
               DescTools
             ])
           ];

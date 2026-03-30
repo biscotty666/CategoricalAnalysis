@@ -97,7 +97,7 @@ The null hypothesis is no association. The alternative is an association between
 - right skewed
 - one set of degrees of freedom
 
-![](chi_square_distribution_visual.png)
+![](images/chi_square_distribution_visual.png)
 
 __Pearson $\chi^2$__
 
