@@ -1,0 +1,68 @@
+---
+title: "Multinomial Logistic Regression"
+format: gfm
+---
+
+[Source](https://www.ariclabarr.com/logistic-regression/part_5_assess.html)
+
+```{r}
+#| echo: false
+options(paged.print = FALSE)
+```
+
+```{r}
+#| message: false
+library(tidyverse)
+library(vcdExtra)
+library(VGAM)
+```
+
+
+```{r}
+gator <- Alligator
+head(gator)
+```
+
+# Generalized Logit Model
+
+Uses relative risk ratios rather than odds ratios.
+
+```{r}
+gator$food <- factor(gator$food)
+
+gator <- gator %>% 
+  filter(count > 0)
+
+glogit_model <- vglm(
+  food ~ size + lake + sex,
+  data = gator,
+  family = multinomial(refLevel = "fish"),
+  weights = count
+)
+
+summary(glogit_model)
+```
+
+# Interpretation
+
+To get relative risk ratios.
+
+```{r}
+100*(exp(coef(glogit_model)) - 1)
+```
+
+# Predictions and Diagnostics
+
+Predicted Proababilities:
+
+```{r}
+pred_probs <- predict(glogit_model, newdata = gator,
+                      type = "response")
+head(pred_probs, n = 10)
+```
+
+
+
+
+
+

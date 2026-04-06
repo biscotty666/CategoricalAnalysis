@@ -40,6 +40,7 @@
               vcd
               vcdExtra
               visreg
+              VGAM
               DescTools
             ])
           ];

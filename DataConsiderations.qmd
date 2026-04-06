@@ -1,0 +1,57 @@
+---
+title: "Data Considerations"
+format: gfm
+---
+
+[Source](https://www.ariclabarr.com/logistic-regression/part_3_data.html)
+
+```{r}
+options(paged.print = FALSE)
+```
+
+```{r}
+#| message: false
+library(tidyverse)
+```
+
+
+```{r}
+churn <- read.csv("data/tele_churn3.csv")
+table(churn$churn)
+```
+
+```{r}
+churn <- churn %>% 
+  rownames_to_column()
+
+to_remove <- churn %>%  
+  filter(churn == 1) %>% 
+  sample_frac(0.55)
+
+churn <- anti_join(churn, to_remove, by = "rowname")
+```
+
+
+# Rare Event Sampling
+
+When an event occurs less than 5% of the time, convergence is difficult. 
+
+Can compensate by oversampling the rare event or undersampling the non-occurences.
+
+```{r}
+table(churn$churn)
+```
+
+```{r}
+prop.table(table(churn$churn))
+```
+
+```{r}
+ids <- 1:nrow(churn) 
+churn %>% 
+  select(-rowname) %>% 
+  mutate(id = 1:nrow(.),
+         .before = 1)
+
+```
+
