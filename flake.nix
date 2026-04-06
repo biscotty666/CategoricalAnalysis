@@ -28,20 +28,23 @@
               quarto
               pagedown
               styler
-              tidyverse
               AmesHousing
+              DescTools
+              Hmisc
+              ROCR
+              ROCit
+              VGAM
+              car
+              ggeffects
               givitiR
               gmodels
-              Hmisc
-              ROCit
-              ROCR
-              car
+              lmtest
               mgcv
+              sandwich
+              tidyverse
               vcd
               vcdExtra
               visreg
-              VGAM
-              DescTools
             ])
           ];
         };
