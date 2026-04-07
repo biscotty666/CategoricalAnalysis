@@ -43,6 +43,7 @@
               gtsummary
               janitor
               lmtest
+              marginaleffects
               margins
               mgcv
               sandwich
