@@ -34,11 +34,16 @@
               ROCR
               ROCit
               VGAM
+              broom
+              broom_helpers
               car
               ggeffects
               givitiR
               gmodels
+              gtsummary
+              janitor
               lmtest
+              margins
               mgcv
               sandwich
               tidyverse
