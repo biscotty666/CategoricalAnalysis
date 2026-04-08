@@ -1,0 +1,182 @@
+---
+title: "Comparing Models"
+format: gfm
+---
+
+
+[Source](https://bookdown.org/sarahwerth2024/CategoricalBook/review-comparing-models-r.html)
+
+```{r}
+#| echo: false
+options(paged.print = FALSE)
+```
+
+
+```{r}
+#| message: false
+libraries <- list(
+  "tidyverse", "car", "lmtest"
+)
+invisible(lapply(libraries, library, character.only = TRUE))
+```
+
+# Question and Prep
+
+What characteristics are associated with separatist movements in ethnocultural groups.
+
+```{r}
+#| message: false
+MAR <- read_csv("data/M.A.R_Cleaned.csv")
+```
+
+```{r}
+MAR <- MAR %>%
+  mutate(
+    trsntlkin = factor(trsntlkin, labels = c(
+      "No Close Kindred",
+      "Close Kindred/Not Adjoining Base",
+      "Close Kindred, Adjoining Base",
+      "Close Kindred, More than 1 Country"
+    )),
+    kinmatsup = factor(kinmatsup, labels = c(
+      "No material kinship support",
+      "Material kinship support"
+    )),
+    kinmilsup = factor(kinmilsup, labels = c(
+      "No military kinship support",
+      "Military kinship support"
+    )),
+    grplang = factor(grplang, labels = c(
+      "<10% Speak Native Lang",
+      "Some Speak Native Lang",
+      "Most Speak Native Lang"
+    ))
+  )
+```
+
+# Wald Test
+
+Does adding or removing sets of variables significantly change the fit.
+
+Test hypotheses:
+- Null hypothesis: the coefficients are all equal to 0 ($H_0: X1 = X2 = 0$)
+- Alt hypothesis: the coefficients are not all equal to zero ($H_A: X1 \ or \ X2 \neq 0$)
+
+Interpretation: If the p value for the test is < .05, then we reject the null hypothesis and the variables significantly explain some piece of the model. It is like the p-value for our coefficients, except for multiple coefficients at the same time. 
+
+## Run regression
+
+```{r}
+fit1 <- glm(sepkin ~ trsntlkin + kinmatsup + kinmilsup +
+              grplang + pct_ctry,
+            data = MAR, family = binomial(link = "logit"))
+summary(fit1, show.residuals = TRUE)
+```
+
+```{r}
+summary(resid(fit1, type = "deviance"))
+```
+
+## `linearHypothesis`
+
+1. Material and military support from kin
+
+For binary variables, are the coefficients for yes equal to 0?
+
+```{r}
+linearHypothesis(fit1, c("kinmatsupMaterial kinship support = 0",
+                          "kinmilsupMilitary kinship support = 0"))
+```
+
+2. Single categorical variables with multiple levels
+
+```{r}
+linearHypothesis(fit1, c("grplangSome Speak Native Lang",
+                         "grplangMost Speak Native Lang"))
+```
+
+## Interpret
+
+In both cases, the null hypothesis can be rejected, meaning the variables improve the fit.
+
+# Likelihood Ratio Test
+
+Most recommended test for comparing glm models, including linear regression, logistic regression, probit regression, ordinal models, poisson, and negative binomial models.
+
+## Overview
+
+Likelihood refers to the probability that the relationship between variables described in the model equation is the true relationship. Maximum likelihood uses the log of the likelihood and compares model fits. with the likelihood ratio test.
+
+Test hypotheses:
+
+- Null hypothesis: the log-likelihoods from one model is equal to the other (H0: log-likelihood model 1 - log-likelihood model 2 = 0)
+- Alt hypothesis: the log-likelihoods are not equal to one another (HA: log-likelihood model 1 - log-likelihood model 2 ≠ 0)
+
+Interpretation: If the p value for the test is < .05, then we reject the null hypothesis and one model improves the fit of the model. 
+
+The likelihood ratio test compares the fit statistic from two nested models. Nested models contain the same dependent variables, with one having a subset of the other's independent variables. The must be run on the same sample.
+
+NB. If the additional variable has many NAs, it may lead to too many dropped rows, making the sample of the larger model smaller than the smaller model. Drop the corresponding rows from the "smaller" model to compensate.
+
+## Drop observations with missing values
+
+```{r}
+MAR <- MAR %>% 
+  drop_na(sepkin, trsntlkin, kinmatsup, kinmilsup, grplang, pct_ctry)
+```
+
+## Run two or more nested models
+
+```{r}
+fit_a <- glm(sepkin ~ trsntlkin,
+             data = MAR, family = binomial(link = "logit"))
+fit_b <- glm(sepkin ~ trsntlkin + grplang + pct_ctry,
+             data = MAR, family = binomial(link = "logit"))
+fit_c <- glm(sepkin ~ trsntlkin + kinmatsup + kinmilsup + grplang + pct_ctry,
+             data = MAR, family = binomial(link = "logit"))
+```
+
+```{r}
+map(list(fit_a, fit_b, fit_c), summary)
+```
+
+## Run the likelihood ratio test
+
+```{r}
+lrtest(fit_b, fit_a)
+```
+
+The log likelihood of model two is -469.41, while model one is -479.54, with a p value less than 0.05, so model 2 is better.
+
+```{r}
+lrtest(fit_c, fit_b)
+```
+
+Model 3 is better.
+
+# AIC and BIC
+
+Akaike/Bayesean Information Criteria. Both rely on log-likelihood statistics and MLE. BIC penalizes complicated models with more covariates. Lower is better.
+
+Models do not need to be nested, but must run on the same sample.
+
+```{r}
+fit_d <- glm(sepkin ~ kinmatsup + kinmilsup,
+             data = MAR, family = binomial(link = "logit"))
+fit_b$aic; fit_d$aic
+```
+
+Model 1 is better.
+
+```{r}
+BIC(fit_b); BIC(fit_d)
+```
+
+Again, model 1 is better.
+
+
+
+
+
+
+
