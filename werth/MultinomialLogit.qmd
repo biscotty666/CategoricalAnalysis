@@ -1,0 +1,449 @@
+---
+title: "Multinomial Logistic Regression"
+format: gfm
+---
+
+[Source](https://bookdown.org/sarahwerth2024/CategoricalBook/multinomial-logit-regression-r.html)
+
+```{r}
+#| echo: false
+options(paged.print = FALSE)
+```
+
+
+```{r}
+#| message: false
+libraries <- list(
+  "tidyverse", "nnet", "broom", "knitr",
+  "kableExtra", "gtsummary", "ggeffects",
+  "marginaleffects", "car", "gt"
+)
+invisible(lapply(libraries, library, character.only = TRUE))
+```
+
+```{r}
+data("Womenlf", package = "carData")
+Womenlf <- Womenlf %>% 
+  mutate(partic = factor(partic, levels=c('not.work', 'parttime', 'fulltime')))
+```
+
+```{r}
+wlf_multinom <- multinom(partic ~ hincome + children,
+                         data = Womenlf, Hess = TRUE)
+```
+
+```{r}
+summary(wlf_multinom, Wald = TRUE)
+```
+
+```{r}
+effects::allEffects(wlf_multinom) %>% 
+  plot(style = "stacked")
+```
+
+
+```{r}
+#| message: false
+mar_df <- read_csv("data/M.A.R_Cleaned.csv")
+```
+
+```{r}
+mar <- mar_df %>%
+  mutate(
+    culgrieve = factor(
+      culgrieve,
+      labels = c(
+        "No Grievances Expressed",
+        "Ending Discrimination",
+        "Creating/Strengthening Remedial Policies"
+      )
+    ),
+    legisrep = factor(
+      legisrep,
+      labels = c("No", "Yes")
+    ),
+    execrep = factor(
+      execrep,
+      labels = c("No", "Yes")
+    ),
+    grplang = factor(
+      grplang,
+      labels = c(
+        "<10% Speak Native Lang",
+        "Some Speak Native Lang",
+        "Most Speak Native Lang"
+      )
+    ),
+    trsntlkin = factor(
+      trsntlkin,
+      labels = c(
+        "No Close Kindred",
+        "Close Kindred/Not Adjoining Base",
+        "Close Kindred, Adjoining Base",
+        "Close Kindred, More than 1 Country"
+      )
+    ),
+  )
+```
+
+# Multinomial Logit Regression
+
+## Equation
+
+Compares each category to a base category, and calculates the relative log odds.
+
+$$
+\ln\left(\frac{P_{categoryB}}{P_{categoryA}}\right)
+$$
+
+$$
+\ln\left(\frac{P}{1-P}\right) = \beta_0 + \beta_1X_1 + ... \beta_kX_k
+$$
+
+The base category is a matter requiring consideration.
+
+## Interpretation
+
+Four options:
+
+1. Relative Log Odds - Equivalent to log-odds
+2. Relative Ris Ratios - Equivalent to odds ratios. Calculated by $e^\beta$.
+3. Predicted Probabilities - As logistic regression, probability of falling into a specific category.
+4. Marginal Effects - As logistic regression, probability of failing into a specific category.
+
+The latter two do not reference the base category. BUT if the independent variable is categorical, no predicted probabilities for the base category are produced.
+
+The output provides coefficients tellint the relative log-odds or relative risk of being in the category relative to the base category.
+
+## Assumptions
+
+1. Independence of irrelevant alternatives
+
+The likelihood of being in one category compared to the base should not change with the addition of other categories. Decide if two options are relatively similar compared to the others.
+
+2. Outcome is categorical
+3. Log-odds of outcome and independent variables have a linear relationship
+4. Errors are independent - no obvious clusters
+5. No severe multicolinearity
+
+# Running a model
+
+We will be running a multinomial logistic regression to see what characteristics are associated with the types of cultural grievances expressed by ethnocultural groups at risk. We will use the variable ‘culgrieve’ as our outcome, which represents the level of cultural grievances expressed by ethnic groups at risk. This variable has three values (the outcomes for our multinomial):
+
+0 - No Grievances Expressed
+1 - Ending Discrmination
+2 - Creating/Strengthening Remedial Policies
+
+## Plot outcome and key independent variable
+
+Category 0 compared to category 1
+
+```{r werth-mlr-1}
+#| warning: false
+#| message: false
+ggplot(mar %>% 
+         filter(culgrieve == "No Grievances Expressed" |
+                  culgrieve == "Ending Discrimination"),
+       aes(x = as.numeric(grplang), y = as.numeric(culgrieve))) +
+  geom_point() +
+  geom_smooth(method = "loess", se = F) +
+  theme_classic()
+```
+
+Category 0 to Category 2
+
+```{r werth-mlr-2}
+#| warning: false
+#| message: false
+ggplot(mar %>% filter(culgrieve == "No Grievances Expressed" | 
+                        culgrieve == "Creating/Strengthening Remedial Policies"),
+       aes(x = as.numeric(grplang), y = as.numeric(culgrieve))) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE) +
+  theme_classic()
+```
+
+## Run models
+
+```{r}
+fit_basic <- multinom(culgrieve ~ grplang, data = mar)
+```
+
+### Display options for results
+
+```{r}
+summary(fit_basic)
+```
+
+```{r}
+tidy(fit_basic, conf.int = T)
+```
+
+```{r werth-mlr-3}
+#| eval: false
+tidy(fit_basic, conf.int = T) %>% 
+  kable() %>% 
+  kable_styling("basic", full_width = F)
+```
+
+```{r werth-mlr-4}
+tidy(fit_basic, conf.int = T) %>% 
+  gt() %>% 
+  fmt_number(decimals = 4)
+```
+
+```{r}
+fit_full <- multinom(culgrieve ~ grplang + trsntlkin + 
+                       legisrep + execrep + pct_ctry, 
+                     data = mar, Hess = TRUE)
+```
+
+```{r}
+tidy(fit_full)
+```
+
+### Relative risk ratios
+
+Option 1 - exponentiate the coefficients with `tbl_regression` and make a table.
+
+```{r werth-mlr-5}
+#| message: false
+tbl_regression(fit_full, exp = TRUE)
+```
+
+Option 2
+
+```{r werth-mlr-6}
+tidy(fit_full, conf.int = T, exponentiate = T) %>% 
+  gt() %>% 
+  fmt_number(decimals = 4)
+```
+
+# Interpret the model
+
+### Relative Log-Odds
+
+Percent of population (pct_ctry):
+
+- Category: Ending Discrimination
+  A one unit increase in percent population is associated with a log(1.0006) or .0006 increase in the log-odds of an ethnocultural group wanting to end discrimination vs having no grievances. It is not statistically significant.
+- Category: Creating/Strengthening Remedial Policies
+  A one unit increase in percent population is associated with a 
+log(1.01570) or .0156 increase in the log-odds of an ethnocultural group wanting to create or strengthen remedial policies vs having no cultural grievances. It is not statistically significant.
+
+Language distinctiveness:
+
+- Category: Ending Discrimination
+  - A group where some medium percentage of members speak the native language (compared to groups where <10% speak the language) is associated with a 1.147 increase in the log-odds of a group wanting to end discrimination compared to having no cultural grievances.
+  - A group where most members speak the native language (compared to groups where <10% speak the language) is associated with a log(0.5627) or .575 decrease in the log-odds of a group wanting to end discrimination compared to having no cultural grievances. It is not statistically significant.
+- Category: Creating/Strengthening Remedial Policies
+  - A group where some medium percentage of members speak the native language (compared to groups where <10% speak the language) is associated with a 2.182 increase in the log-odds of a group wanting to create/strengthen remedial policies compared to having no cultural grievances.
+  - A group where most members speak the native language (compared to groups where <10% speak the language) is associated with a .705 decrease in the log-odds of a group wanting to create/strengthen remedial policies compared to having no cultural grievances. It is not statistically significant.
+
+### Relative Risk Ratios
+
+Percent of population:
+
+- Category: Ending Discrimination
+  - A one unit increase in percent population multiplies the odds of wanting to end discrimination vs having no grievances by 1.0006 (basically 0%). It is not statistically significant.
+- Category: Creating/Strengthening Remedial Policies
+  - A one unit increase in percent population multiplies the odds of wanting to create or strengthen remedial policies vs having no cultural grievances by 1.016 (1.6%). It is not statistically signifcant.
+
+Language distinctiveness:
+
+- Category: Ending Discrimination
+  - A group where some medium percentage of members speak the native language (compared to groups where <10% speak the language) is multiplies the odds of wanting to end discrimination compared to having no cultural grievances by 3.15 (215%).
+  - A group where most members speak the native language (compared to groups where <10% speak the language) multiplies the odds of wanting to end discrimination compared to having no cultural grievances by .562 (-43.8%). It is not statistically significant.
+- Category: Creating/Strengthening Remedial Policies
+  - A group where some medium percentage of members speak the native language (compared to groups where <10% speak the language) multiplies the odds of wanting to create/strengthen remedial policies compared to having no cultural grievances by 8.87 (786.8 %).
+  - A group where most members speak the native language (compared to groups where <10% speak the language) multiplies the odds of wanting to create/strengthen remedial policies compared to having no cultural grievances by 2.02 (102%). It is not statistically significant.
+
+### Marginal Effects
+
+```{r}
+avg_comparisons(
+  fit_full, type = "probs", 
+  by = "group", variables = "pct_ctry") %>% 
+  tidy()
+```
+
+Category 1: No Grievances
+
+A one unit increase in the percent the group represents in the total population is associated with a .001 descrease in the probability that the group has no grievances.
+
+Category 2: Ending Discrimination
+
+A one unit increase in the percent the group represents in the total population is associated with a .0006 decrease in the probability that the group wants to end discrimination.
+
+Category 3: Creating/Strengthening Remedial Policies
+
+A one unit increase in the percent the group represents in the total population is associated with a .002 increase in the probability that the group wants to create or strengthen remedial policies.
+
+
+```{r}
+avg_comparisons(
+  fit_full, type = "probs", 
+  by = "group", variables = "grplang") %>% 
+  tidy()
+```
+
+Category 1: No Grievances
+
+- A group where some medium percentage of members speak the native language (compared to groups where <10% speak the language) is associated with a .307 decrease in the probability of having no grievances.
+- A group where most members speak the native language (compared to groups where <10% speak the language) is associated with a .041 increase in the probability of having no grievances. It is not statistically significant.
+
+Category 2: Ending Discrimination
+
+- A group where some medium percentage of members speak the native language (compared to groups where <10% speak the language) is associated with a .157 increase in the probability of wanting to end discrimination.
+- A group where most members speak the native language (compared to groups where <10% speak the language) is associated with a .087 decrease in the probability of wanting to end discrimination. It is not statistically significant.
+
+Category 3: Creating/Strengthening Remedial Policies
+
+- A group where some medium percentage of members speak the native language (compared to groups where <10% speak the language) is associated with a .150 increase in the probability of wanting to create or strengthen remedial policies.
+- A group where most members speak the native language (compared to groups where <10% speak the language) is associated with a .045 increase in the probability of wanting to create/strengthen remedial policies. It is not statistically significant.
+
+### Predicted Probabilities
+
+```{r werth-mlr-7}
+response_labs <- c("No Grieve", "End Discrim", "Remedial Policies")
+names(response_labs) <- c("No.Grievances.Expressed", "Ending.Discrimination",
+                          "Creating.Strengthening.Remedial.Policies")
+
+ggeffect(fit_full, terms = "pct_ctry[0:80 by = 20]") %>%
+  plot() +
+  facet_wrap(~ response.level,
+             labeller = labeller(response.level = response_labs)) +
+  labs(
+    y = "Cultural Grievance",
+    x = "Percent of Country Population"
+  )
+```
+
+```{r werth-mlr-8}
+pprob_pct_ctry <- ggeffect(fit_full, 
+                           terms = "pct_ctry[0:80 by = 20]")
+
+ggplot(pprob_pct_ctry, aes(
+  x = x, y = predicted,
+  color = response.level, group = response.level
+)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(
+    aes(
+      ymin = conf.low, ymax = conf.high,
+      color = response.level, group = response.level
+    ),
+    width = 1
+  ) +
+  scale_color_brewer(
+    palette = "Dark2",
+    name = "",
+    labels = c(
+      "Remedial Policies",
+      "Ending Discrimination",
+      "No Grievances"
+    )
+  ) +
+  labs(
+    x = "Group as Percentage of Country's Population",
+    y = "Probability"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.title = element_text(size = 14)
+  )
+```
+
+```{r werth-mlr-9}
+ggeffect(fit_full, terms = "grplang") %>% 
+  plot()
+```
+
+```{r werth-mlr-10}
+pprob_grplang <- ggeffect(fit_full, 
+                           terms = "grplang")
+
+ggplot(pprob_grplang, aes(
+  x = x, y = predicted,
+  color = response.level, group = response.level
+)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(
+    aes(
+      ymin = conf.low, ymax = conf.high,
+      color = response.level, group = response.level
+    ),
+    width = .05
+  ) +
+  scale_color_brewer(
+    palette = "Dark2",
+    name = "",
+    labels = c(
+      "Remedial Policies",
+      "Ending Discrimination",
+      "No Grievances"
+    )
+  ) +
+  labs(
+    x = "Language Distinctiveness",
+    y = "Probability"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.title = element_text(size = 14)
+  )
+```
+
+## Check Assumptions
+
+# Wald Test for MLR
+
+```{r}
+summary(fit_full, Wald = TRUE)
+```
+
+
+```{r}
+library(effects)
+allEffects(fit_full)
+```
+
+```{r}
+Anova(fit_full)
+```
+
+
+```{r}
+#| eval: false
+linearHypothesis(fit_full,
+                 c("Ending Discrimination:pct_ctry = 0",
+                   "Creating/Strengthening Remedial Policies:pct_ctry = 0"))
+```
+
+```{r}
+#| eval: false
+linearHypothesis(fit_full,
+                   c("Ending Discrimination:legisrepYes = 0",
+                     "Creating/Strengthening Remedial Policies:legisrepYes = 0"))
+```
+
+```{r}
+round(summary(fit_full)$coefficients, 3)
+```
+
+```{r}
+z <- summary(fit_full)$coefficients / summary(fit_full)$standard.errors
+p <- (1 - pnorm(abs(z), 0, 1)) * 2
+round(p, digits = 3)
+```
+
+
+
+
+
+
+

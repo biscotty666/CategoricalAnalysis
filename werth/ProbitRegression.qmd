@@ -74,6 +74,11 @@ summary(fit_basic)
 ```
 
 ```{r}
+names(nba)
+```
+
+
+```{r}
 fit_full <- glm(target_5yrs ~ pts + gp + fg + x3p + ast + blk,
                 data = nba, family = binomial(link = probit))
 summary(fit_full)

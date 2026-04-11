@@ -27,6 +27,8 @@
             (with rPackages; [
               quarto
               pagedown
+              knitr
+              kableExtra
               styler
               AmesHousing
               DescTools
@@ -37,6 +39,8 @@
               broom
               broom_helpers
               car
+              carData
+              effects
               ggeffects
               givitiR
               gmodels
@@ -47,11 +51,13 @@
               marginaleffects
               margins
               mgcv
+              nnet
               sandwich
               tidyverse
               vcd
               vcdExtra
               visreg
+              webshot
             ])
           ];
         };
