@@ -41,6 +41,7 @@
               givitiR
               gmodels
               gtsummary
+              huxtable
               janitor
               lmtest
               marginaleffects
